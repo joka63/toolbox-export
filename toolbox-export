@@ -1,22 +1,35 @@
 #!/bin/sh
+#
+# toolbox-export - export application starters or binaries to host
+#
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# This file is part of the distrobox project:
-#    https://github.com/89luca89/distrobox
+# Copyright (C) 2023 Joachim Katzer
 #
-# Copyright (C) 2021 toolbox contributors
+# Toolbox-export is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-# toolbox is free software; you can redistribute it and/or modify it
-# under the terms of the GNU General Public License version 3
-# as published by the Free Software Foundation.
-#
-# toolbox is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
+# Toolbox-export is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with toolbox; if not, see <http://www.gnu.org/licenses/>.
+# along with toolbox-export.  If not, see <http://www.gnu.org/licenses/>.
+#
+# ---------------------------------------------------------------------
+# The official toolbox-export website is located at:
+# https://github.com/joka63/toolbox-export
+#
+# The sources are partially derived from the distrobox project under
+# the terms of the GPL-3.0-only license:
+# https://github.com/89luca89/distrobox
+#
+# Author:
+# Joachim Katzer <joka63@gmx.de>
+# ---------------------------------------------------------------------
 
 # POSIX
 # Expected env variables:
