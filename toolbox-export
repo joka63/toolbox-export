@@ -22,11 +22,11 @@
 # Expected env variables:
 #	HOME
 #	USER
-#	TOOLBOX_RUN_PATH
+#	TOOLBOX_PATH
 #	TOOLBOX_HOST_HOME
 
 # Defaults
-dest_path=""
+dest_path="${HOME}/.local/bin"
 export_action=""
 exported_app=""
 exported_app_label=""
@@ -42,6 +42,7 @@ is_login=0
 is_sudo=0
 verbose=0
 version="0.0.1"
+CONTAINER_ID=${CONTAINER_ID-""}
 
 # We depend on some commands, let's be sure we have them
 base_dependencies="basename grep sed find"
@@ -205,9 +206,20 @@ if [ -n "${exported_bin}" ] && [ -z "${dest_path}" ]; then
 fi
 
 declare -a ToolboxRunOptions
-if  [ -n "${CONTAINER_ID}" ]; then
+if  [ -n "$CONTAINER_ID" ]; then
 	container_name="${CONTAINER_ID}"
 	ToolboxRunOptions+=("-c" "${CONTAINER_ID}")
+else
+	# Use the default toolbox and retrieve its container name
+	container_name=$(
+	${TOOLBOX_PATH:-"toolbox"} run bash << ________END
+	grep "name=" /run/.containerenv | cut -d'=' -f2- | tr -d '"'
+________END
+	)
+	if [ $? -ne 0 ] ; then
+		printf >&2 "Error: Default toolbox not running.\n"
+		exit 2
+	fi
 fi
 
 #
@@ -220,7 +232,7 @@ else
 fi
 
 # Prefix to add to an existing command to work through the container
-container_command_prefix="${TOOLBOX_RUN_PATH:-"toolbox run"} -c ${container_name} ${start_shell} "
+container_command_prefix="${TOOLBOX_PATH:-"toolbox"} run -c ${container_name} ${start_shell} "
 if [ -z "${exported_app_label}" ]; then
 	exported_app_label=" (on ${container_name})"
 fi
@@ -231,39 +243,20 @@ check_if_toolbox_exists() {
 	for i in ${Available_Toolboxes}
 	do
 	    #check if the element matches the search value
-	    if [ "$i" == "$CONTAINER_ID" ]
+	    if [ "$i" == "$container_name" ]
 	    then
 		return 0
 	    fi
 	done
-	printf >&2 "No toolbox with name '${CONTAINER_ID}' found"
+	printf >&2 "No toolbox with name '${container_name}' found"
 	return 1
 }
 check_if_toolbox_exists || exit 2
 
-# Print generated script from template
-# Arguments:
-#	none it will use the ones set up globally
-# Outputs:
-#	print generated script.
-generate_script() {
-	cat << EOF
-#!/bin/sh
-# toolbox_binary
-# name: ${container_name}
-if [ ! -f /run/.containerenv ] && [ ! -f /.dockerenv ]; then
-	exec ${TOOLBOX_RUN_PATH:-"toolbox run"} -c ${container_name} \
-		${start_shell} ${exported_bin} ${extra_flags} "\$@"
-else
-	exec ${exported_bin} "\$@"
-fi
-EOF
-	return $?
-}
-
 # Export binary to destination directory.
 # the following function will use generate_script to create a shell script in
 # dest_path that will execute the exported binary in the selected toolbox.
+# This script will be executed in the container and is therefore written as here-script.
 #
 # Arguments:
 #	none it will use the ones set up globally
@@ -271,41 +264,71 @@ EOF
 #	a generated_script in dest_path
 #	or error code.
 export_binary() {
+    ${TOOLBOX_PATH:-"toolbox"} ${ToolboxRunOptions[@]} run bash << ________END
+	# Print generated script from template
+	# Arguments:
+	#	none it will use the ones set up globally
+	# Outputs:
+	#	print generated script.
+	generate_script() {
+		cat << EOF
+#!/bin/sh
+# toolbox_binary
+# toolbox name: ${container_name}
+if [ ! -f /run/.containerenv ] ; then
+	if [ "\\\$(id -u)" -eq 0 ]; then
+		printf >&2 "You must not run %s as root in a toolbox container!\n" " \$(basename "${exported_bin}")"
+		exit 127
+	fi
+	exec ${TOOLBOX_PATH:-"toolbox"} run -c ${container_name} \
+		${start_shell} ${exported_bin} ${extra_flags} "\\\$@"
+else
+	exec ${exported_bin} "\\\$@"
+fi
+EOF
+		return \$?
+	}
+
+	# Here begins export_binary
+	if [ "${verbose}" -ne 0 ]; then
+		set -o xtrace
+	fi
 	# Ensure the binary we're exporting is installed
 	if [ ! -f "${exported_bin}" ]; then
 		printf >&2 "Error: cannot find %s.\n" "${exported_bin}"
-		return 127
+		exit 127
 	fi
 	# generate dest_file path
-	dest_file="${dest_path}/$(basename "${exported_bin}")"
+	dest_file="/run/host${dest_path}/\$(basename "${exported_bin}")"
 
 	# If we're deleting it, just do it and exit
 	if [ "${exported_delete}" -ne 0 ] &&
 		# ensure it's a toolbox exported binary
-		grep -q "toolbox_binary" "${dest_file}"; then
+		grep -q "toolbox_binary" "\${dest_file}"; then
 
-		if rm -f "${dest_file}"; then
+		if rm -f "\${dest_file}"; then
 			printf "%s from %s removed successfully from %s.\nOK!\n" \
 				"${exported_bin}" "${container_name}" "${dest_path}"
-			return 0
+			exit 0
 		fi
 	fi
 
 	# test if we have writing rights on the file
-	if ! touch "${dest_file}"; then
-		printf >&2 "Error: cannot create destination file %s.\n" "${dest_file}"
-		return 1
+	if ! touch "\${dest_file}"; then
+		printf >&2 "Error: cannot create destination file %s.\n" "\${dest_file}"
+		exit 1
 	fi
 
 	# create the script from template and write to file
-	if generate_script > "${dest_file}"; then
-		chmod +x "${dest_file}"
-		printf "%s from %s exported successfully in %s.\nOK!\n" \
+	if generate_script > "\${dest_file}"; then
+		chmod +x "\${dest_file}"
+		printf "%s from %s exported successfully to %s.\nOK!\n" \
 			"${exported_bin}" "${container_name}" "${dest_path}"
-		return 0
+		exit 0
 	fi
 	# Unknown error.
-	return 3
+	exit 3
+________END
 }
 
 # Export graphical application to the host.
@@ -313,6 +336,7 @@ export_binary() {
 # the selected application. It will then put the needed icons in the host's icons
 # directory and create a new .desktop file that will execute the selected application
 # in the toolbox.
+# This script will be executed in the container and is therefore written as here-script.
 #
 # Arguments:
 #	none it will use the ones set up globally
@@ -344,7 +368,7 @@ export_application() {
 		find \${canon_dirs} \
 			-type f \
 			-exec grep -qle "Exec=.*${exported_app}.*" {} \; \
-			-exec grep -Le "Exec=.*${TOOLBOX_RUN_PATH:-"toolbox run"}.*" {} \;
+			-exec grep -Le "Exec=.*${TOOLBOX_PATH:-"toolbox"} run.*" {} \;
 		# shellcheck disable=SC2086
 		find \${canon_dirs} \
 			-name "${exported_app}*"
