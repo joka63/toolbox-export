@@ -1,0 +1,148 @@
+toolbox-export(1)
+=================
+:date: 2023-06-02
+:release-version: 0.0.1
+:man manual: Toolbox-Export Manual
+:man source: toolbox-export {release-version}
+
+
+NAME
+----
+
+toolbox-export - export application starters or binaries to host
+
+SYNOPSIS
+--------
+
+[verse]
+toolbox-export [-c _Toolbox_Name_] --app _Package_Name_ [--delete] [_Option_]..
+toolbox-export [-c _Toolbox_Name_] --bin _/path/to/bin_ [--delete] [_Option_]..
+toolbox-export [-h|--help|-V|--version]
+
+
+DESCRIPTION
+-----------
+
+You may want to install graphical applications or CLI tools in your toolbox.
+Using `toolbox-export` from **outside** the container will let you use them from the host itself.
+
+**Application and binary exporting**
+
+toolbox-export takes care of exporting an app or a binary from the container
+to the host.
+
+The exported app will be easily available in your normal launcher and it will
+automatically be launched from the container it is exported from.
+
+
+OPTIONS
+-------
+
+--container/-c::		
+    name of the toolbox container. If not given, the default toolbox 
+    will be used. On Fedora its name is fedora-toolbox-_release_.
+
+--app/-a::		
+    name of the application to export
+
+--bin/-b::		
+    absolute path of the binary to export
+
+--delete/-d::		
+    delete exported application or binary
+
+--export-label::	
+    label to add to exported application name.
+    Defaults to $_container_name_.
+
+--export-path::	
+    path where to export the binary
+
+--extra-flags::	
+    extra flags to add to the command
+
+--login/-l::      	
+    run the exported item in a login shell
+
+--sudo/-S::		
+    specify if the exported item should be run as sudo
+
+--help/-h::
+    show this message
+
+--verbose/-v::		
+    show more verbosity
+
+--version/-V::
+   show version
+
+
+EXAMPLES
+--------
+
+**App export example**
+
+[verse]
+toolbox-export --app abiword
+
+This tool will simply copy the original `.desktop` files along with needed icons,
+add the prefix `/usr/local/bin/toolbox-enter -n toolbox_name -e ...` to the commands to run, and
+save them in your home to be used directly from the host as a normal app.
+
+**Binary export example**
+
+[verse]
+toolbox-export --bin /usr/bin/code --extra-flags "--foreground" --export-path $HOME/bin
+
+In the case of exporting binaries, you may want to specify **where** to export it
+(`--export-path`) and the tool will create a little wrapper script that will
+`toolbox run` from the host, the desired binary.
+The default export-path is `$HOME/.local/bin`
+
+This can be handy with the use of `direnv` to have different versions of the same binary based on
+your `env` or project.
+
+The exported binaries will be exported in the "--export-path" of choice as a wrapper
+script that acts naturally both on the host and in the container.
+
+**Additional flags**
+
+You can specify additional flags to add to the command, for example if you want
+to export an electron app, you could add the "--foreground" flag to the command:
+
+	toolbox-export --app atom --extra-flags "--foreground"
+	toolbox-export --bin /usr/bin/vim --export-path ~/bin --extra-flags "-p"
+
+This works for binaries and apps.
+Extra flags are only used then the exported app or binary is used from
+the host, using them inside the container will not include them.
+
+**Unexport**
+
+The option "--delete" will un-export an app or binary
+
+	toolbox-export --app atom --delete
+	toolbox-export --bin /usr/bin/vim --export-path ~/bin --delete
+
+**Run as root in the container**
+
+The option "--sudo" will launch the exported item as root inside the toolbox.
+
+**Run inside a login shell**
+
+The option "--login" will launch the exported item inside a login shell, allowing access to
+variables sourced at login in the container (e.g: /etc/profile).
+
+**Exporting apps from rootful containers**
+
+This is not supported by toolbox-export, since toolboxes are always rootless podman containers.
+
+**Notes**
+
+Note you can use --app OR --bin but not together.
+
+Some electron apps such as vscode and atom need additional flags to work from inside the
+container, use the `--extra-flags` option to provide a series of flags, for example:
+
+[verse]
+toolbox-export --app atom --extra-flags "--foreground"`
