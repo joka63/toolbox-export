@@ -55,8 +55,6 @@ toolbox-export -c mytoolbox --bin /usr/bin/rg
 toolbox-export --container mytoolbox --bin /usr/bin/rg --delete
 ```
 
-
-
 ## Installation
 
 toolbox-export wurde auf und für Fedora Silverblue 38 entwickelt und getestet. Auf anderen Linux-Distributionen, die toolbox (bzw. podman-toolbox) unterstützen, sind wahrscheinlich noch Anpassungen erforderlich.
