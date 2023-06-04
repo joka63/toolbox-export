@@ -36,17 +36,17 @@ Den Export kann man rückgängig machen, indem man das gleiche Kommando mit der 
 
 ## Unterschiede zu distrobox-export
 
-- Toolbox basiert (laut offizieller Dokumentation) ausschließlich auf rootless-Podman-Containern. Daher kann toolbox-export keine Optionen für privilegierte Container mit Root-Rechten unterstützen. Exportierte Binaries dürfen nicht von root oder mit sudo aufgerufen werden, das könnte den Toolbox-Container unbrauchbar machen! Die generierten Wrapper enthalten daher einen Check, der einen versehentlichen Aufruf als Root (vom Host aus) blockiert:
+Toolbox basiert (laut offizieller Dokumentation) ausschließlich auf rootless-Podman-Containern. Daher kann toolbox-export keine Optionen für privilegierte Container mit Root-Rechten unterstützen. Exportierte Binaries dürfen nicht von root oder mit sudo aufgerufen werden, das könnte den Toolbox-Container unbrauchbar machen! Die generierten Wrapper enthalten daher einen Check, der einen versehentlichen Aufruf als Root (vom Host aus) blockiert:
 
-- ```
+```
 $ sudo ~/.local/bin/gview /etc/passwd
 You must not run  gview as root in a toolbox container!
 ```
 
 
-- Im Gegensatz zu `distrobox-export` wird `toolbox-export` auf dem Host und nicht in den Containern aufgerufen, daher gibt es noch eine zusätzliche Option `--container` oder kurz `-c`, zum Beispiel:
+Im Gegensatz zu `distrobox-export` wird `toolbox-export` auf dem Host und nicht in den Containern aufgerufen, daher gibt es noch eine zusätzliche Option `--container` oder kurz `-c`, zum Beispiel:
 
-- ```
+```
 # export firefox from "mytoolbox"
 toolbox-export --container mytoolbox --app /usr/share/application/firefox.desktop 
 # export ripgrep from "mytoolbox"
