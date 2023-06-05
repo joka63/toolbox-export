@@ -9,6 +9,8 @@ Toolbox-export is basically an adaptation of the distrobox shell script distrobo
 
 ## Examples:
 
+![Demo: Export von KMyMoney](demo/toolbox-export-demo.gif)
+
 ### Export of an app:
 
 ```

@@ -9,6 +9,8 @@ Toolbox-export ist im Wesentlichen eine Anpassung des distrobox-Shellskripts `di
 
 ## Beispiele:
 
+![Demo: Export von KMyMoney](demo/toolbox-export-demo.gif)
+
 ### Export einer App:
 
 ```
