@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # toolbox-export - export application starters or binaries to host
 #
@@ -54,7 +54,7 @@ start_shell=""
 is_login=0
 is_sudo=0
 verbose=0
-version="0.0.1"
+version="0.0.2"
 CONTAINER_ID=${CONTAINER_ID-""}
 
 # We depend on some commands, let's be sure we have them
@@ -285,7 +285,7 @@ export_binary() {
 	#	print generated script.
 	generate_script() {
 		cat << EOF
-#!/bin/sh
+#!/bin/bash
 # toolbox_binary
 # toolbox name: ${container_name}
 if [ ! -f /run/.containerenv ] ; then

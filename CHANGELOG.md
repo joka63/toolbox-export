@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 
+## [0.0.2] - 2023-07-18
+
+### Fixed
+- toolbox-export not working on Debian because of shebang (/bin/sh is not the same as /bin/bash on Debian)
+
 ## [0.0.1] - 2023-06-04
 
 ### Added
