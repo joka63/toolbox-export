@@ -54,7 +54,7 @@ start_shell=""
 is_login=0
 is_sudo=0
 verbose=0
-version="0.0.2"
+version="0.0.3"
 CONTAINER_ID=${CONTAINER_ID-""}
 
 # We depend on some commands, let's be sure we have them
@@ -186,8 +186,7 @@ fi
 
 # Check we're running inside a container and not on the host.
 if [ -f /run/.containerenv ] ; then
-	printf >&2 "You must not run %s inside a container!\n" " $(basename "$0")"
-	exit 126
+	container_name=$(grep "name=" /run/.containerenv | cut -d'=' -f2- | tr -d '"')
 fi
 
 # We're working with HOME, so we must run as USER, not as root.
