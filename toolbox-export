@@ -114,13 +114,15 @@ setup_toolbox_export() {
 		path TEXT PRIMARY KEY,
 		bin TEXT NOT NULL,
 		container TEXT NOT NULL,
-		cksum INTEGER UNIQUE
+		cksum INTEGER,
+		UNIQUE(path,bin,container)
 	);
 	CREATE TABLE IF NOT EXISTS apps (
 		path TEXT PRIMARY KEY,
 		app TEXT NOT NULL,
 		container TEXT NOT NULL,
-		cksum INTEGER UNIQUE
+		cksum INTEGER,
+		UNIQUE(path,app,container)
 	);
 	INSERT OR IGNORE INTO about VALUES ('$version');
 ________END
@@ -128,7 +130,7 @@ ________END
 
 cleanup_toolbox_export() {
 	TOOLBOX_EXPORT_CONFIG_DIR="${TOOLBOX_EXPORT_DB_PATH%/*}" 
-	rm -f "${TOOLBOX_EXPORT_DB_PATH}"
+	rm -f "${TOOLBOX_EXPORT_DB_PATH}" "${SQL_TMP_FILE}"
 	rmdir "$TOOLBOX_EXPORT_CONFIG_DIR"
 }
 
@@ -354,7 +356,7 @@ ________________________EOF
 		delete )
 			cat >> "$SQL_TMP_FILE" << ________________________EOF
 			DELETE FROM binaries 
-			WHERE path = '\$path' AND bin = '\$bin' AND container = '\$container' 
+			WHERE path = '\$path' AND bin = '\$bin' AND container = '\$container' ;
 ________________________EOF
 		;;
 		esac
@@ -456,13 +458,13 @@ export_application() {
 		insert )
 			cksum=\$(cksum "\$path" | awk '{print \$1}')
 			cat >> "$SQL_TMP_FILE" << ________________________EOF
-			INSERT INTO applications VALUES ('\$path', '\$app', '\$container', \$cksum);
+			INSERT OR IGNORE INTO apps VALUES ('\$path', '\$app', '\$container', \$cksum);
 ________________________EOF
 		;;
 		delete )
 			cat >> "$SQL_TMP_FILE" << ________________________EOF
-			DELETE FROM applications 
-			WHERE path = '\$path' AND app = '\$app' AND container = '\$container' 
+			DELETE FROM apps 
+			WHERE path = '\$path' AND app = '\$app' AND container = '\$container' ;
 ________________________EOF
 		;;
 		esac
