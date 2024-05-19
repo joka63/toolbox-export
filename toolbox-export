@@ -37,6 +37,7 @@
 #	USER
 #	TOOLBOX_PATH
 #	TOOLBOX_HOST_HOME
+#	TOOLBOX_EXPORT_DB_PATH
 
 # Defaults
 dest_path="${HOME}/.local/bin"
@@ -54,8 +55,11 @@ start_shell=""
 is_login=0
 is_sudo=0
 verbose=0
-version="0.0.3"
+version="0.0.4"
 CONTAINER_ID=${CONTAINER_ID-""}
+TOOLBOX_EXPORT_DB_PATH=${TOOLBOX_EXPORT_DB_PATH-"$HOME/.config/toolbox-export/exported.db"}
+TOOLBOX_EXPORT_CONFIG_DIR="${TOOLBOX_EXPORT_DB_PATH%/*}" 
+SQL_TMP_FILE="${TOOLBOX_EXPORT_CONFIG_DIR}/tmp-actions.sql"
 
 # We depend on some commands, let's be sure we have them
 base_dependencies="basename grep sed find"
@@ -78,6 +82,7 @@ toolbox-export version: ${version}
 Usage:
 	toolbox-export [-c <CONTAINER_ID>] --app mpv [--extra-flags "flags"] [--delete] [--sudo]
 	toolbox-export [-c <CONTAINER_ID>] --bin /path/to/bin --export-path ~/.local/bin [--extra-flags "flags"] [--delete] [--sudo]
+	toolbox-export [-c <CONTAINER_ID>] --prune
 
 Options:
 
@@ -94,12 +99,42 @@ Options:
 	--help/-h:		show this message
 	--verbose/-v:		show more verbosity
 	--version/-V:		show version
+	--prune:		remove all exported app starters and icons belonging to CONTAINER_IR
 EOF
+}
+
+setup_toolbox_export() {
+	TOOLBOX_EXPORT_CONFIG_DIR="${TOOLBOX_EXPORT_DB_PATH%/*}" 
+	mkdir -p "$TOOLBOX_EXPORT_CONFIG_DIR"
+	sqlite3 -separator '\t' "$TOOLBOX_EXPORT_DB_PATH" << ________END
+	CREATE TABLE IF NOT EXISTS about (
+		version TEXT PRIMARY KEY
+  	);
+	CREATE TABLE IF NOT EXISTS binaries (
+		path TEXT PRIMARY KEY,
+		bin TEXT NOT NULL,
+		container TEXT NOT NULL,
+		cksum INTEGER UNIQUE
+	);
+	CREATE TABLE IF NOT EXISTS apps (
+		path TEXT PRIMARY KEY,
+		app TEXT NOT NULL,
+		container TEXT NOT NULL,
+		cksum INTEGER UNIQUE
+	);
+	INSERT OR IGNORE INTO about VALUES ('$version');
+________END
+}
+
+cleanup_toolbox_export() {
+	TOOLBOX_EXPORT_CONFIG_DIR="${TOOLBOX_EXPORT_DB_PATH%/*}" 
+	rm -f "${TOOLBOX_EXPORT_DB_PATH}"
+	rmdir "$TOOLBOX_EXPORT_CONFIG_DIR"
 }
 
 # Parse arguments
 TEMP=$(getopt -o hvVc:a:b:lSd \
-	--long help,verbose,version,container:,app:,bin:,login,sudo,delete,export-label:,export-path:,extra-flags: \
+	--long help,verbose,version,container:,app:,bin:,login,sudo,delete,export-label:,export-path:,extra-flags:,prune,setup,cleanup \
         -n 'toolbox-export' -- "$@")
 if [ $? != 0 ] ; then exit 1 ; fi
 eval set -- "$TEMP"
@@ -172,6 +207,18 @@ while :; do
 			exported_delete=1
 			shift
 			;;
+		--prune)
+			exported_delete_all=1
+			shift
+			;;
+		--setup)
+			export_action="setup"
+			shift
+			;;
+		--cleanup)
+			export_action="cleanup"
+			shift
+			;;
 		*) # Default case: If no more options then break out of the loop.
 			break ;;
 	esac
@@ -194,6 +241,18 @@ if [ "$(id -u)" -eq 0 ]; then
 	printf >&2 "You must not run %s as root!\n" " $(basename "$0")"
 	exit 1
 fi
+
+# Handle special actions here
+case "${export_action}" in
+	setup)
+		setup_toolbox_export
+		exit 0
+		;;
+	cleanup)
+		cleanup_toolbox_export
+		exit 0
+		;;
+esac
 
 # Ensure the foundamental variables are set and not empty, we will not proceed
 # if they are not all set.
@@ -277,6 +336,30 @@ check_if_toolbox_exists || exit 2
 #	or error code.
 export_binary() {
     ${TOOLBOX_PATH:-"toolbox"} ${ToolboxRunOptions[@]} run bash << ________END
+	# Log generated or removed files as SQL commands
+	log_binaries() {
+		path="\$4"
+		bin="\$2"
+		container="\$3"
+		cksum=\$(cksum "\$path" | awk '{print \$1}')
+		case "\$1" in 
+		start )
+			rm -f "$SQL_TMP_FILE"
+			;;
+		insert )
+			cat >> "$SQL_TMP_FILE" << ________________________EOF
+			INSERT INTO binaries VALUES ('\$path', '\$bin', '\$container', \$cksum);
+________________________EOF
+		;;
+		delete )
+			cat >> "$SQL_TMP_FILE" << ________________________EOF
+			DELETE FROM binaries 
+			WHERE path = '\$path' AND bin = '\$bin' AND container = '\$container' 
+________________________EOF
+		;;
+		esac
+        }
+
 	# Print generated script from template
 	# Arguments:
 	#	none it will use the ones set up globally
@@ -302,6 +385,7 @@ EOF
 	}
 
 	# Here begins export_binary
+	log_binaries start
 	if [ "${verbose}" -ne 0 ]; then
 		set -o xtrace
 	fi
@@ -321,6 +405,7 @@ EOF
 		if rm -f "\${dest_file}"; then
 			printf "%s from %s removed successfully from %s.\nOK!\n" \
 				"${exported_bin}" "${container_name}" "${dest_path}"
+			log_binaries delete "${exported_bin}" "${container_name}" "\${dest_file}"
 			exit 0
 		fi
 	fi
@@ -336,6 +421,7 @@ EOF
 		chmod +x "\${dest_file}"
 		printf "%s from %s exported successfully to %s.\nOK!\n" \
 			"${exported_bin}" "${container_name}" "${dest_path}"
+		log_binaries insert "${exported_bin}" "${container_name}" "\${dest_file}"
 		exit 0
 	fi
 	# Unknown error.
@@ -358,6 +444,31 @@ ________END
 #	or error code.
 export_application() {
     toolbox ${ToolboxRunOptions[@]} run bash << ________END
+	# Log generated or removed files as SQL commands
+	log_applications() {
+		path="\$4"
+		app="\$2"
+		container="\$3"
+		case "\$1" in 
+		start )
+			rm -f "$SQL_TMP_FILE"
+			;;
+		insert )
+			cksum=\$(cksum "\$path" | awk '{print \$1}')
+			cat >> "$SQL_TMP_FILE" << ________________________EOF
+			INSERT INTO applications VALUES ('\$path', '\$app', '\$container', \$cksum);
+________________________EOF
+		;;
+		delete )
+			cat >> "$SQL_TMP_FILE" << ________________________EOF
+			DELETE FROM applications 
+			WHERE path = '\$path' AND app = '\$app' AND container = '\$container' 
+________________________EOF
+		;;
+		esac
+        }
+
+	log_applications start
 	if [ "${verbose}" -ne 0 ]; then
 		set -o xtrace
 	fi
@@ -422,8 +533,8 @@ export_application() {
 
 		# replace canonical paths with equivalent paths in HOME
 		icon_home_directory="\$(dirname "\${icon_file}" |
-			sed "s|/usr/share/|\/run\/host\/${host_home}/.local/share/|g" |
-			sed "s|/var/lib/flatpak/exports/share|\/run\/host\/${host_home}/.local/share/|g" |
+			sed "s|/usr/share/|\/run\/host${host_home}/.local/share/|g" |
+			sed "s|/var/lib/flatpak/exports/share|\/run\/host${host_home}/.local/share/|g" |
 			sed "s|pixmaps|icons|g")"
 
 		# check if we're exporting an icon which is not in a canonical path
@@ -435,13 +546,17 @@ export_application() {
 		# check if we're exporting or deleting
 		if [ "${exported_delete}" -ne 0 ]; then
 			# we need to remove, not export
-			rm -rf "\${icon_home_directory:?}"/"\$(basename "\${icon_file:?}")"
+			dest_file="\${icon_home_directory:?}/\$(basename "\${icon_file:?}")"
+			rm -rf "\${dest_file}"
+			log_applications delete "${exported_app}" "${container_name}" "\${dest_file}"
 			continue
 		fi
 
 		# we wanto to export the application's icons
 		mkdir -p "\${icon_home_directory}"
 		cp -r "\$(realpath "\${icon_file}")" "\${icon_home_directory}"
+		dest_file="\${icon_home_directory:?}/\$(basename "\${icon_file:?}")"
+		log_applications insert "${exported_app}" "${container_name}" "\${dest_file}"
 	done
 
 	# create desktop files for the toolbox
@@ -452,7 +567,9 @@ export_application() {
 		# check if we're exporting or deleting
 		if [ "${exported_delete}" -ne 0 ]; then
 			rm -f "/run/host${host_home}/.local/share/applications/\${desktop_original_file}"
-			rm -f "/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
+			dest_file="/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
+			rm -f "\${dest_file}"
+			log_applications delete "${exported_app}" "${container_name}" "\${dest_file}"
 			# we're done, go to next
 			continue
 		fi
@@ -462,33 +579,32 @@ export_application() {
 		# Add closing quote
 		# If a TryExec is present, we have to fake it as it will not work
 		# through the container separation
+		dest_file="/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
 		sed "s|^Exec=|Exec=${container_command_prefix} |g" "\${desktop_file}" |
 			sed "s|\(%.*\)|${extra_flags} \1|g" |
 			sed "/^TryExec=.*/d" |
 			sed "/^DBusActivatable=true/d" |
 			sed "s|Name.*|& ${exported_app_label}|g" \
-				> "/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
+				> "\${dest_file}"
 		# in the end we add the final quote we've opened in the "container_command_prefix"
 
 		if ! grep -q "StartupWMClass" "/run/host${host_home}/.local/share/applications/\${desktop_home_file}"; then
-			printf "StartupWMClass=%s\n" "${exported_app}" >> "\
-/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
+			printf "StartupWMClass=%s\n" "${exported_app}" >> "\${dest_file}"
 		fi
 		# In case of an icon in a non canonical path, we need to replace the path
 		# in the desktop file.
 		if [ -n "\${icon_file_absolute_path}" ]; then
 			sed -i "s|Icon=.*|Icon=\${icon_file_absolute_path}|g" \
-				"/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
+				"\${dest_file}"
 			# we're done, go to next
 			continue
 		fi
 
 		# In case of an icon in a canonical path, but specified as an absolute
 		# we need to replace the path in the desktop file.
-		sed -i "s|Icon=/usr/share/|Icon=/run/host${host_home}/.local/share/|g" \
-			"/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
-		sed -i "s|pixmaps|icons|g" \
-			"/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
+		sed -i "s|Icon=/usr/share/|Icon=/run/host${host_home}/.local/share/|g" "\${dest_file}"
+		sed -i "s|pixmaps|icons|g" "\${dest_file}"
+		log_applications insert "${exported_app}" "${container_name}" "\${dest_file}"
 	done
 
 	if [ "${exported_delete}" -ne 0 ]; then
@@ -509,6 +625,12 @@ case "${export_action}" in
 		;;
 	bin)
 		export_binary
+		;;
+	setup)
+		setup_toolbox_export
+		;;
+	cleanup)
+		cleanup_toolbox_export
 		;;
 	*)
 		printf >&2 "Invalid arguments, choose an action below.\n"
