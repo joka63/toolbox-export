@@ -225,13 +225,23 @@ while :; do
 	esac
 done
 
-set -o errexit
 set -o nounset
 # set verbosity
 if [ "${verbose}" -ne 0 ]; then
 	set -o xtrace
 fi
 
+# Check if sqlite3 is installed
+SQLITE3=$(which sqlite3)
+if [[ -z "$SQLITE3" ]] ; then
+	echo >&2 "WARNING: Without sqlite3, the options --list and --purge are not available"
+fi
+if [[ "${exported_bin##*/}" = "sqlite3" ]] ; then
+	## If sqlite3 itself gets exported (or export removed), don't use it:
+	SQLITE3=""
+fi
+
+set -o errexit
 # Check we're running inside a container and not on the host.
 if [ -f /run/.containerenv ] ; then
 	container_name=$(grep "name=" /run/.containerenv | cut -d'=' -f2- | tr -d '"')
@@ -254,6 +264,11 @@ case "${export_action}" in
 		exit 0
 		;;
 esac
+
+# Ensure export.db exists
+if [ -n "$SQLITE3" -a ! -f "$TOOLBOX_EXPORT_DB_PATH" ] ; then
+	setup_toolbox_export
+fi
 
 # Ensure the foundamental variables are set and not empty, we will not proceed
 # if they are not all set.
@@ -358,9 +373,6 @@ ________________________EOF
 			WHERE path = '\$path' AND bin = '\$bin' AND container = '\$container' ;
 ________________________EOF
 		;;
-		finalize )
-			sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE"
-		;;
 		esac
         }
 
@@ -408,7 +420,6 @@ EOF
 
 		if rm -f "\${dest_file}"; then
 			log_binaries delete "${exported_bin}" "${container_name}" "\${dest_file}"
-			log_binaries finalize
 			printf "%s from %s removed successfully from %s.\nOK!\n" \
 				"${exported_bin}" "${container_name}" "${dest_path}"
 			exit 0
@@ -425,7 +436,6 @@ EOF
 	if generate_script > "\${dest_file}"; then
 		chmod +x "\${dest_file}"
 		log_binaries insert "${exported_bin}" "${container_name}" "\${dest_file}"
-		log_binaries finalize
 		printf "%s from %s exported successfully to %s.\nOK!\n" \
 			"${exported_bin}" "${container_name}" "${dest_path}"
 		exit 0
@@ -433,7 +443,7 @@ EOF
 	# Unknown error.
 	exit 3
 ________END
-	[[ $? -eq 0 ]] && sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE" || return $?
+	[[ $? -eq 0 ]] && [[ -n "$SQLITE3" ]] && sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE" || return $?
 }
 
 # Export graphical application to the host.
@@ -471,8 +481,6 @@ ________________________EOF
 			DELETE FROM apps 
 			WHERE path = '\$path' AND app = '\$app' AND container = '\$container' ;
 ________________________EOF
-		;;
-		finalize )
 		;;
 		esac
         }
@@ -616,7 +624,6 @@ ________________________EOF
 		log_applications insert "${exported_app}" "${container_name}" "\${dest_file}"
 	done
 
-	log_applications finalize
 	if [ "${exported_delete}" -ne 0 ]; then
 		printf "Application %s successfully un-exported.\nOK!\n" "${exported_app}"
 		printf "%s will disappear from your applications list in a few seconds.\n" "${exported_app}"
@@ -625,7 +632,7 @@ ________________________EOF
 		printf "%s will appear in your applications list in a few seconds.\n" "${exported_app}"
 	fi
 ________END
-	[[ $? -eq 0 ]] && sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE" || return $?
+	[[ $? -eq 0 ]] && [[ -n "$SQLITE3" ]] && sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE" || return $?
 }
 
 # Main routine 
