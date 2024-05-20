@@ -83,7 +83,7 @@ toolbox-export version: ${version}
 Usage:
 	toolbox-export [-c <CONTAINER_ID>] --app mpv [--extra-flags "flags"] [--delete] [--sudo]
 	toolbox-export [-c <CONTAINER_ID>] --bin /path/to/bin --export-path ~/.local/bin [--extra-flags "flags"] [--delete] [--sudo]
-	toolbox-export [-c <CONTAINER_ID>] --prune
+	toolbox-export [-c <CONTAINER_ID>] {--prune|--list}
 
 Options:
 
@@ -101,6 +101,7 @@ Options:
 	--verbose/-v:		show more verbosity
 	--version/-V:		show version
 	--prune:		remove all exported app starters and icons belonging to CONTAINER_IR
+	--list:			list all exported app starters and icons belonging to CONTAINER_IR
 EOF
 }
 
@@ -133,9 +134,25 @@ cleanup_toolbox_export() {
 	rmdir "$TOOLBOX_EXPORT_DATA_DIR"
 }
 
+list_exported() {
+if [ -z "$CONTAINER_ID" ] ; then
+sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
+.mode box
+SELECT DISTINCT app,container,path FROM apps WHERE path LIKE '%.desktop';
+SELECT DISTINCT bin,container,path FROM binaries 
+END
+else
+sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
+.mode box
+SELECT DISTINCT app,path FROM apps WHERE path LIKE '%.desktop' AND container = '$CONTAINER_ID';
+SELECT DISTINCT bin,path FROM binaries WHERE container = '$CONTAINER_ID'
+END
+fi
+}
+
 # Parse arguments
 TEMP=$(getopt -o hvVc:a:b:lSd \
-	--long help,verbose,version,container:,app:,bin:,login,sudo,delete,export-label:,export-path:,extra-flags:,prune,setup,cleanup \
+	--long help,verbose,version,container:,app:,bin:,login,sudo,delete,export-label:,export-path:,extra-flags:,list,prune,setup,cleanup \
         -n 'toolbox-export' -- "$@")
 if [ $? != 0 ] ; then exit 1 ; fi
 eval set -- "$TEMP"
@@ -208,6 +225,10 @@ while :; do
 			exported_delete=1
 			shift
 			;;
+		--list)
+			export_action="list"
+			shift
+			;;
 		--prune)
 			exported_delete_all=1
 			shift
@@ -257,6 +278,10 @@ fi
 case "${export_action}" in
 	setup)
 		setup_toolbox_export
+		exit 0
+		;;
+	list)
+		list_exported
 		exit 0
 		;;
 	cleanup)
