@@ -54,7 +54,7 @@ start_shell=""
 is_login=0
 is_sudo=0
 verbose=0
-version="0.0.3"
+version="0.1.0"
 CONTAINER_ID=${CONTAINER_ID-""}
 
 # We depend on some commands, let's be sure we have them
