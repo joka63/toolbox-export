@@ -37,7 +37,7 @@
 #	USER
 #	TOOLBOX_PATH
 #	TOOLBOX_HOST_HOME
-#	TOOLBOX_EXPORT_DB_PATH
+#	XDG_DATA_HOME
 
 # Defaults
 dest_path="${HOME}/.local/bin"
@@ -47,8 +47,8 @@ exported_app_label=""
 exported_bin=""
 exported_delete=0
 extra_flags=""
-# Use DBX_HOST_HOME if defined, else fallback to HOME
-#	DBX_HOST_HOME is set in case container is created
+# Use TOOLBOX_HOST_HOME if defined, else fallback to HOME
+#	TOOLBOX_HOST_HOME is set in case container is created
 #	with custom --home directory
 host_home="${TOOLBOX_HOST_HOME:-"${HOME}"}"
 start_shell=""
@@ -57,9 +57,10 @@ is_sudo=0
 verbose=0
 version="0.0.4"
 CONTAINER_ID=${CONTAINER_ID-""}
-TOOLBOX_EXPORT_DB_PATH=${TOOLBOX_EXPORT_DB_PATH-"$HOME/.config/toolbox-export/exported.db"}
-TOOLBOX_EXPORT_CONFIG_DIR="${TOOLBOX_EXPORT_DB_PATH%/*}" 
-SQL_TMP_FILE="${TOOLBOX_EXPORT_CONFIG_DIR}/tmp-actions.sql"
+XDG_DATA_HOME=${XDG_DATA_HOME-"$HOME/.local/share"}
+TOOLBOX_EXPORT_DATA_DIR="$XDG_DATA_HOME/toolbox-export"
+SQL_TMP_FILE="${TOOLBOX_EXPORT_DATA_DIR}/tmp-actions.sql"
+TOOLBOX_EXPORT_DB_PATH="${TOOLBOX_EXPORT_DATA_DIR}/exported.db"
 
 # We depend on some commands, let's be sure we have them
 base_dependencies="basename grep sed find"
@@ -104,8 +105,7 @@ EOF
 }
 
 setup_toolbox_export() {
-	TOOLBOX_EXPORT_CONFIG_DIR="${TOOLBOX_EXPORT_DB_PATH%/*}" 
-	mkdir -p "$TOOLBOX_EXPORT_CONFIG_DIR"
+	mkdir -p "$TOOLBOX_EXPORT_DATA_DIR"
 	sqlite3 -separator '\t' "$TOOLBOX_EXPORT_DB_PATH" << ________END
 	CREATE TABLE IF NOT EXISTS about (
 		version TEXT PRIMARY KEY
@@ -129,9 +129,8 @@ ________END
 }
 
 cleanup_toolbox_export() {
-	TOOLBOX_EXPORT_CONFIG_DIR="${TOOLBOX_EXPORT_DB_PATH%/*}" 
 	rm -f "${TOOLBOX_EXPORT_DB_PATH}" "${SQL_TMP_FILE}"
-	rmdir "$TOOLBOX_EXPORT_CONFIG_DIR"
+	rmdir "$TOOLBOX_EXPORT_DATA_DIR"
 }
 
 # Parse arguments
@@ -359,6 +358,9 @@ ________________________EOF
 			WHERE path = '\$path' AND bin = '\$bin' AND container = '\$container' ;
 ________________________EOF
 		;;
+		finalize )
+			sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE"
+		;;
 		esac
         }
 
@@ -405,9 +407,10 @@ EOF
 		grep -q "toolbox_binary" "\${dest_file}"; then
 
 		if rm -f "\${dest_file}"; then
+			log_binaries delete "${exported_bin}" "${container_name}" "\${dest_file}"
+			log_binaries finalize
 			printf "%s from %s removed successfully from %s.\nOK!\n" \
 				"${exported_bin}" "${container_name}" "${dest_path}"
-			log_binaries delete "${exported_bin}" "${container_name}" "\${dest_file}"
 			exit 0
 		fi
 	fi
@@ -421,14 +424,16 @@ EOF
 	# create the script from template and write to file
 	if generate_script > "\${dest_file}"; then
 		chmod +x "\${dest_file}"
+		log_binaries insert "${exported_bin}" "${container_name}" "\${dest_file}"
+		log_binaries finalize
 		printf "%s from %s exported successfully to %s.\nOK!\n" \
 			"${exported_bin}" "${container_name}" "${dest_path}"
-		log_binaries insert "${exported_bin}" "${container_name}" "\${dest_file}"
 		exit 0
 	fi
 	# Unknown error.
 	exit 3
 ________END
+	[[ $? -eq 0 ]] && sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE" || return $?
 }
 
 # Export graphical application to the host.
@@ -466,6 +471,8 @@ ________________________EOF
 			DELETE FROM apps 
 			WHERE path = '\$path' AND app = '\$app' AND container = '\$container' ;
 ________________________EOF
+		;;
+		finalize )
 		;;
 		esac
         }
@@ -609,6 +616,7 @@ ________________________EOF
 		log_applications insert "${exported_app}" "${container_name}" "\${dest_file}"
 	done
 
+	log_applications finalize
 	if [ "${exported_delete}" -ne 0 ]; then
 		printf "Application %s successfully un-exported.\nOK!\n" "${exported_app}"
 		printf "%s will disappear from your applications list in a few seconds.\n" "${exported_app}"
@@ -617,7 +625,7 @@ ________________________EOF
 		printf "%s will appear in your applications list in a few seconds.\n" "${exported_app}"
 	fi
 ________END
-
+	[[ $? -eq 0 ]] && sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE" || return $?
 }
 
 # Main routine 
