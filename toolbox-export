@@ -83,7 +83,7 @@ toolbox-export version: ${version}
 Usage:
 	toolbox-export [-c <CONTAINER_ID>] --app mpv [--extra-flags "flags"] [--delete] [--sudo]
 	toolbox-export [-c <CONTAINER_ID>] --bin /path/to/bin --export-path ~/.local/bin [--extra-flags "flags"] [--delete] [--sudo]
-	toolbox-export [-c <CONTAINER_ID>] {--prune|--list}
+	toolbox-export [-c <CONTAINER_ID>] {--purge|--list}
 
 Options:
 
@@ -100,8 +100,8 @@ Options:
 	--help/-h:		show this message
 	--verbose/-v:		show more verbosity
 	--version/-V:		show version
-	--prune:		remove all exported app starters and icons belonging to CONTAINER_IR
-	--list:			list all exported app starters and icons belonging to CONTAINER_IR
+	--purge:		remove all exported app starters and icons not belonging to a toolbox
+	--list:			list all exported app starters and icons 
 EOF
 }
 
@@ -112,19 +112,21 @@ setup_toolbox_export() {
 		version TEXT PRIMARY KEY
   	);
 	CREATE TABLE IF NOT EXISTS binaries (
-		path TEXT PRIMARY KEY,
+		path TEXT,
 		bin TEXT NOT NULL,
 		container TEXT NOT NULL,
 		cksum INTEGER,
 		UNIQUE(path,bin,container)
 	);
+	CREATE INDEX idx_binaries_path ON binaries(path);
 	CREATE TABLE IF NOT EXISTS apps (
-		path TEXT PRIMARY KEY,
+		path TEXT,
 		app TEXT NOT NULL,
 		container TEXT NOT NULL,
 		cksum INTEGER,
 		UNIQUE(path,app,container)
 	);
+	CREATE INDEX idx_apps_path ON apps(path);
 	INSERT OR IGNORE INTO about VALUES ('$version');
 ________END
 }
@@ -150,9 +152,55 @@ END
 fi
 }
 
+joinByChar() {
+  local IFS="$1"
+  shift
+  echo "$*"
+}
+
+joinByString() {
+  local separator="$1"
+  shift
+  local first="$1"
+  shift
+  printf "%s" "$first" "${@/#/$separator}"
+}
+
+list_files_to_be_removed() {
+sep_current_toolboxes=$(joinByString "', '" $(toolbox list -c | tail -n +2 | awk '{print $2}'))
+sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
+SELECT DISTINCT path from binaries 
+WHERE container NOT IN ('$sep_current_toolboxes') AND path NOT IN 
+        ( SELECT DISTINCT path from binaries WHERE container IN ('$sep_current_toolboxes') ) ;
+SELECT DISTINCT path from apps 
+WHERE container NOT IN ('$sep_current_toolboxes') AND path NOT IN 
+        ( SELECT DISTINCT path from apps WHERE container IN ('$sep_current_toolboxes') ) ;
+END
+}
+
+purge_files_in_db() {
+sep_current_toolboxes=$(joinByString "', '" $(toolbox list -c | tail -n +2 | awk '{print $2}'))
+sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
+.mode tabs
+DELETE from binaries WHERE container NOT IN ('$sep_current_toolboxes') ;
+DELETE from apps WHERE container NOT IN ('$sep_current_toolboxes') ;
+END
+echo "Cleaned up $TOOLBOX_EXPORT_DB_PATH"
+}
+
+purge() {
+	echo "Removing starters and exported binaries not belonging to a current toolbox:"
+	Files=$(list_files_to_be_removed)
+	if [ -n "$Files" ] ; then
+		rm -i ${Files} && purge_files_in_db
+	else
+		purge_files_in_db
+	fi
+}
+
 # Parse arguments
 TEMP=$(getopt -o hvVc:a:b:lSd \
-	--long help,verbose,version,container:,app:,bin:,login,sudo,delete,export-label:,export-path:,extra-flags:,list,prune,setup,cleanup \
+	--long help,verbose,version,container:,app:,bin:,login,sudo,delete,export-label:,export-path:,extra-flags:,list,purge,setup,cleanup \
         -n 'toolbox-export' -- "$@")
 if [ $? != 0 ] ; then exit 1 ; fi
 eval set -- "$TEMP"
@@ -229,8 +277,8 @@ while :; do
 			export_action="list"
 			shift
 			;;
-		--prune)
-			exported_delete_all=1
+		--purge)
+			export_action="purge"
 			shift
 			;;
 		--setup)
@@ -282,6 +330,10 @@ case "${export_action}" in
 		;;
 	list)
 		list_exported
+		exit 0
+		;;
+	purge)
+		purge
 		exit 0
 		;;
 	cleanup)
@@ -382,12 +434,12 @@ export_binary() {
 		path="\$4"
 		bin="\$2"
 		container="\$3"
-		cksum=\$(cksum "\$path" | awk '{print \$1}')
 		case "\$1" in 
 		start )
 			rm -f "$SQL_TMP_FILE"
 			;;
 		insert )
+			cksum=\$(cksum "\$path" | awk '{print \$1}')
 			cat >> "$SQL_TMP_FILE" << ________________________EOF
 			INSERT INTO binaries VALUES ('\$path', '\$bin', '\$container', \$cksum);
 ________________________EOF
@@ -436,7 +488,7 @@ EOF
 		exit 127
 	fi
 	# generate dest_file path
-	dest_file="/run/host${dest_path}/\$(basename "${exported_bin}")"
+	dest_file="${dest_path}/\$(basename "${exported_bin}")"
 
 	# If we're deleting it, just do it and exit
 	if [ "${exported_delete}" -ne 0 ] &&
@@ -481,8 +533,8 @@ ________END
 # Arguments:
 #	none it will use the ones set up globally
 # Outputs:
-#	needed icons in /run/host/$host_home/.local/share/icons
-#	needed desktop files in /run/host/$host_home/.local/share/applications
+#	needed icons in $host_home/.local/share/icons
+#	needed desktop files in $host_home/.local/share/applications
 #	or error code.
 export_application() {
     toolbox ${ToolboxRunOptions[@]} run bash << ________END
@@ -567,7 +619,7 @@ ________________________EOF
 	done
 
 	# create applications dir if not existing
-	mkdir -p "/run/host${host_home}/.local/share/applications"
+	mkdir -p "${host_home}/.local/share/applications"
 
 	# copy icons in home directory
 	icon_file_absolute_path=""
@@ -575,13 +627,13 @@ ________________________EOF
 
 		# replace canonical paths with equivalent paths in HOME
 		icon_home_directory="\$(dirname "\${icon_file}" |
-			sed "s|/usr/share/|\/run\/host${host_home}/.local/share/|g" |
-			sed "s|/var/lib/flatpak/exports/share|\/run\/host${host_home}/.local/share/|g" |
+			sed "s|/usr/share/|${host_home}/.local/share/|g" |
+			sed "s|/var/lib/flatpak/exports/share|${host_home}/.local/share/|g" |
 			sed "s|pixmaps|icons|g")"
 
 		# check if we're exporting an icon which is not in a canonical path
 		if [ "\${icon_home_directory}" = "\$(dirname "\${icon_file}")" ]; then
-			icon_home_directory="/run/host${host_home}/.local/share/icons/"
+			icon_home_directory="${host_home}/.local/share/icons/"
 			icon_file_absolute_path="\${icon_home_directory}\$(basename "\${icon_file}")"
 		fi
 
@@ -608,8 +660,8 @@ ________________________EOF
 
 		# check if we're exporting or deleting
 		if [ "${exported_delete}" -ne 0 ]; then
-			rm -f "/run/host${host_home}/.local/share/applications/\${desktop_original_file}"
-			dest_file="/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
+			rm -f "${host_home}/.local/share/applications/\${desktop_original_file}"
+			dest_file="${host_home}/.local/share/applications/\${desktop_home_file}"
 			rm -f "\${dest_file}"
 			log_applications delete "${exported_app}" "${container_name}" "\${dest_file}"
 			# we're done, go to next
@@ -621,7 +673,7 @@ ________________________EOF
 		# Add closing quote
 		# If a TryExec is present, we have to fake it as it will not work
 		# through the container separation
-		dest_file="/run/host${host_home}/.local/share/applications/\${desktop_home_file}"
+		dest_file="${host_home}/.local/share/applications/\${desktop_home_file}"
 		sed "s|^Exec=|Exec=${container_command_prefix} |g" "\${desktop_file}" |
 			sed "s|\(%.*\)|${extra_flags} \1|g" |
 			sed "/^TryExec=.*/d" |
@@ -630,7 +682,7 @@ ________________________EOF
 				> "\${dest_file}"
 		# in the end we add the final quote we've opened in the "container_command_prefix"
 
-		if ! grep -q "StartupWMClass" "/run/host${host_home}/.local/share/applications/\${desktop_home_file}"; then
+		if ! grep -q "StartupWMClass" "${host_home}/.local/share/applications/\${desktop_home_file}"; then
 			printf "StartupWMClass=%s\n" "${exported_app}" >> "\${dest_file}"
 		fi
 		# In case of an icon in a non canonical path, we need to replace the path
@@ -644,7 +696,7 @@ ________________________EOF
 
 		# In case of an icon in a canonical path, but specified as an absolute
 		# we need to replace the path in the desktop file.
-		sed -i "s|Icon=/usr/share/|Icon=/run/host${host_home}/.local/share/|g" "\${dest_file}"
+		sed -i "s|Icon=/usr/share/|Icon=${host_home}/.local/share/|g" "\${dest_file}"
 		sed -i "s|pixmaps|icons|g" "\${dest_file}"
 		log_applications insert "${exported_app}" "${container_name}" "\${dest_file}"
 	done
