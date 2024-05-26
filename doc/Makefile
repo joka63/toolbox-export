@@ -2,9 +2,9 @@ DOCS       = FAQ.md
 MAN_MAN1   = toolbox-export.1
 
 PN         = toolbox-export
-PREFIX    ?= /usr/local
-DOCDIR     = $(PREFIX)/share/doc/$(PN)
-MAN1DIR    = $(PREFIX)/share/man/man1
+DESTDIR	  ?= /usr/local
+DOCDIR     = share/doc/$(PN)
+MAN1DIR    = share/man/man1
 
 ifeq ($(COMPRESS), yes)
   DOCS     := $(addsuffix .gz,$(DOCS))
@@ -27,8 +27,8 @@ man1: $(MAN_MAN1)
 install: install-man 
 
 install-man: man
-	install -d -m 755 "$(DESTDIR)$(MAN1DIR)"
-	install -p -m 644 $(MAN_MAN1) "$(DESTDIR)$(MAN1DIR)"
+	install -d -m 755 "$(DESTDIR)/$(MAN1DIR)"
+	install -p -m 644 $(MAN_MAN1) "$(DESTDIR)/$(MAN1DIR)"
 
 clean:
 	rm -f *.md.gz *.[15] *.[15].{gz,html}

@@ -8,11 +8,11 @@ DOCS        = ChangeLog \
               README.md
 
 PN          = toolbox-export
-PREFIX     ?= /usr/local
-BINDIR      = $(PREFIX)/bin
-DOCDIR      = $(PREFIX)/share/doc/$(PN)
-BASHCOMPDIR = $(PREFIX)/share/bash-completion/completions
-MAN1DIR     = $(PREFIX)/share/man/man1
+DESTDIR	   ?= /usr/local
+BINDIR      = bin
+DOCDIR      = share/doc/$(PN)
+BASHCOMPDIR = share/bash-completion/completions
+MAN1DIR     = share/man/man1
 
 ifeq ($(COMPRESS), yes)
   DOCS := $(addsuffix .gz,$(DOCS))
@@ -31,8 +31,8 @@ install: install-bin install-man
 
 install-bin:
 	@echo 'installing binary...'
-	install -d -m 755 "$(DESTDIR)$(BINDIR)"
-	install -p -m 755 $(BINS) "$(DESTDIR)$(BINDIR)"
+	install -d -m 755 "$(DESTDIR)/$(BINDIR)"
+	install -p -m 755 $(BINS) "$(DESTDIR)/$(BINDIR)"
 
 install-man: man
 	@echo 'installing man pages...'
@@ -40,8 +40,8 @@ install-man: man
 
 install-doc: $(DOCS)
 	@echo 'installing documentation...'
-	install -d -m 755 "$(DESTDIR)$(DOCDIR)"
-	install -p -m 644 $(DOCS) "$(DESTDIR)$(DOCDIR)"
+	install -d -m 755 "$(DESTDIR)/$(DOCDIR)"
+	install -p -m 644 $(DOCS) "$(DESTDIR)/$(DOCDIR)"
 	@$(MAKE) -C doc install-doc
 
 man:
