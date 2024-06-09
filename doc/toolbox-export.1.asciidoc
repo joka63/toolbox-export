@@ -1,7 +1,7 @@
 toolbox-export(1)
 =================
 :date: 2023-06-02
-:release-version: 0.0.1
+:release-version: 0.2.1
 :man manual: Toolbox-Export Manual
 :man source: toolbox-export {release-version}
 
@@ -17,6 +17,7 @@ SYNOPSIS
 [verse]
 toolbox-export [-c _Toolbox_Name_] --app _Package_Name_ [--delete] [_Option_]..
 toolbox-export [-c _Toolbox_Name_] --bin _/path/to/bin_ [--delete] [_Option_]..
+toolbox-export {--list|--purge}
 toolbox-export [-h|--help|-V|--version]
 
 
@@ -50,6 +51,14 @@ OPTIONS
 
 --delete/-d::		
     delete exported application or binary
+
+--list::		
+    list all exported app starters and icons. 
+    In combination with option `--app/a` or `--bin/-b` list the exported files
+    of given app or binary.
+
+--purge::		
+    remove all exported app starters and icons not belonging to a toolbox
 
 --export-label::	
     label to add to exported application name.
@@ -123,6 +132,20 @@ The option "--delete" will un-export an app or binary
 
 	toolbox-export --app atom --delete
 	toolbox-export --bin /usr/bin/vim --export-path ~/bin --delete
+
+**Purge**
+
+With the option "--purge" it is possible to remove starters and exported binaries
+not belonging to any current toolbox. This is possible when toolbox-export can
+record all actions to an SQL database `~/.local/data/toolbox-export/exported.db`.
+
+It looks up for starters and binaries not recorded
+into the sqlite `exported.db` and adds them before deciding
+which files have to be removed. This cleans up starters and
+binaries added by toolbox-export before without sqlite3 support.
+
+toolbox-export asks for confirmation for each starter or binary it would
+remove on purge.
 
 **Run as root in the container**
 
