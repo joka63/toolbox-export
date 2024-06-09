@@ -46,7 +46,7 @@ You must not run  gview as root in a toolbox container!
 ```
 
 
-Im Gegensatz zu `distrobox-export` wird `toolbox-export` auf dem Host und nicht in den Containern aufgerufen, daher gibt es noch eine zusätzliche Option `--container` oder kurz `-c`, zum Beispiel:
+Im Gegensatz zu `distrobox-export` kann `toolbox-export` auch auf dem Host und nicht nur in den Containern aufgerufen werden, daher gibt es noch eine zusätzliche Option `--container` oder kurz `-c`, zum Beispiel:
 
 ```
 # export firefox from "mytoolbox"
