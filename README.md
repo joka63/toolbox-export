@@ -45,7 +45,7 @@ $ sudo ~/.local/bin/gview /etc/passwd
 You must not run gview as root in a toolbox container!
 ```
 
-Unlike distrobox-export, toolbox-export is called on the host and not in the containers, so there is an additional option `--container` (or `-c` for short), for example:
+Unlike distrobox-export, toolbox-export can be called on the host and not only in the containers, so there is an additional option `--container` (or `-c` for short), for example:
 
 ```
 # export firefox from "mytoolbox"
