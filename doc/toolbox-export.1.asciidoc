@@ -53,7 +53,9 @@ OPTIONS
     delete exported application or binary
 
 --list::		
-    list all exported app starters and icons
+    list all exported app starters and icons. 
+    In combination with option `--app/a` or `--bin/-b` list the exported files
+    of given app or binary.
 
 --purge::		
     remove all exported app starters and icons not belonging to a toolbox

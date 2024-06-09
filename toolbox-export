@@ -41,6 +41,7 @@
 
 # Defaults
 dest_path="${HOME}/.local/bin"
+action=""
 export_action=""
 exported_app=""
 exported_app_label=""
@@ -55,7 +56,7 @@ start_shell=""
 is_login=0
 is_sudo=0
 verbose=0
-version="0.2.0"
+version="0.2.1"
 CONTAINER_ID=${CONTAINER_ID-""}
 XDG_DATA_HOME=${XDG_DATA_HOME-"$HOME/.local/share"}
 TOOLBOX_EXPORT_DATA_DIR="$XDG_DATA_HOME/toolbox-export"
@@ -141,17 +142,25 @@ list_toolboxes() {
 }
 
 list_exported() {
-if [ -z "$CONTAINER_ID" ] ; then
-sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
-.mode box
-SELECT DISTINCT app,container,path FROM apps WHERE path LIKE '%.desktop';
-SELECT DISTINCT bin,container,path FROM binaries 
-END
-else
+if [ -n "$CONTAINER_ID" ] ; then
 sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
 .mode box
 SELECT DISTINCT app,path FROM apps WHERE path LIKE '%.desktop' AND container = '$CONTAINER_ID';
 SELECT DISTINCT bin,path FROM binaries WHERE container = '$CONTAINER_ID'
+END
+elif [ -n "$exported_app" ] ; then
+sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
+SELECT DISTINCT path FROM apps WHERE app = '$exported_app';
+END
+elif [ -n "$exported_bin" ] ; then
+sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
+SELECT DISTINCT path FROM binaries WHERE bin = '$exported_bin';
+END
+else
+sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
+.mode box
+SELECT DISTINCT app,container,path FROM apps WHERE path LIKE '%.desktop';
+SELECT DISTINCT bin,container,path FROM binaries 
 END
 fi
 }
@@ -293,19 +302,19 @@ while :; do
 			shift
 			;;
 		--list)
-			export_action="list"
+			action="list"
 			shift
 			;;
 		--purge)
-			export_action="purge"
+			action="purge"
 			shift
 			;;
 		--setup)
-			export_action="setup"
+			action="setup"
 			shift
 			;;
 		--cleanup)
-			export_action="cleanup"
+			action="cleanup"
 			shift
 			;;
 		*) # Default case: If no more options then break out of the loop.
@@ -342,7 +351,7 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 
 # Handle special actions here
-case "${export_action}" in
+case "${action}" in
 	setup)
 		setup_toolbox_export
 		exit 0
