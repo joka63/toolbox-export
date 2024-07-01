@@ -22,11 +22,15 @@ export of application starters. This mini-project aims to provide the missing fe
 
 Toolbox-export is basically an adaptation of the distrobox shell script distrobox-export to toolbox. It adopts its options and call syntax as much as possible.
 
+
 %prep
 %autosetup
+sed 's/^version=.*$/'$(cat VERSION.txt)'/' toolbox-export
+
 
 %build
 make 
+
 
 %install
 DESTDIR=%{buildroot}/%{_prefix} make install
