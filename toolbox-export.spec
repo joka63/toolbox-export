@@ -1,5 +1,5 @@
 %global srcname toolbox-export
-%
+
 Name:    toolbox-export
 Version: 0.0.0
 Release: 0%{?dist}
@@ -29,13 +29,13 @@ Toolbox-export is basically an adaptation of the distrobox shell script distrobo
 make 
 
 %install
-DESTDIR=%{buildroot} make install
+DESTDIR=%{buildroot}/%{_prefix} make install
 
 
 %files
 %doc README.md
 %doc README.de.md
-%doc ACKNOWLEDGEMENTS.md
+%doc ACKNOWLEDGMENTS.md
 %doc AUTHORS.md
 %license COPYING.md
 %{_bindir}/%{name}
