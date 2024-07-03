@@ -59,7 +59,7 @@ Installation
 
 ## Installation
 
-**Toolbox-export** has been developed and tested on and for Fedora Silverblue 38. On other Linux distributions that support toolbox (or podman-toolbox), adaptations are probably still required.
+**Toolbox-export** has been developed and tested on and for Fedora Silverblue 38-40. On other Linux distributions that support toolbox (or podman-toolbox), adaptations are probably still required.
 
 ### Dependencies
 
@@ -67,6 +67,14 @@ Installation
 - toolbox
 - make
 - asciidoctor
+
+### Installation by dnf in Fedora:
+
+```
+sudo dnf copr enable joka63/toolbox-export
+sudo dnf install toolbox-export
+```
+This is possible on the Fedora host and within a Fedora based toolbox container as well.
 
 ### Installation by git clone:
 

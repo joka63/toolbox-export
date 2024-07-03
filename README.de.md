@@ -59,7 +59,7 @@ toolbox-export --container mytoolbox --bin /usr/bin/rg --delete
 
 ## Installation
 
-toolbox-export wurde auf und für Fedora Silverblue 38 entwickelt und getestet. Auf anderen Linux-Distributionen, die toolbox (bzw. podman-toolbox) unterstützen, sind wahrscheinlich noch Anpassungen erforderlich.
+toolbox-export wurde auf und für Fedora Silverblue 38-40 entwickelt und getestet. Auf anderen Linux-Distributionen, die toolbox (bzw. podman-toolbox) unterstützen, sind wahrscheinlich noch Anpassungen erforderlich.
 
 ### Abhängigkeiten
 
@@ -67,6 +67,14 @@ toolbox-export wurde auf und für Fedora Silverblue 38 entwickelt und getestet. 
 - toolbox
 - make
 - asciidoctor
+- sqlite3
+
+### Installation in Fedora mit dnf:
+```
+sudo dnf copr enable joka63/toolbox-export
+sudo dnf install toolbox-export
+```
+Dies ist sowohl auf einem Fedora-Host wie auch in einem auf Fedora 40 basiertem Toolbox-Container möglich.
 
 ### Installation per git clone:
 
