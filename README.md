@@ -67,6 +67,7 @@ Installation
 - toolbox
 - make
 - asciidoctor
+- sqlite3
 
 ### Installation by dnf in Fedora:
 
