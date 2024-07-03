@@ -1,7 +1,7 @@
 %global srcname toolbox-export
 
 Name:    toolbox-export
-Version: 0.2.1
+Version: 0.2.2
 Release: 1%{?dist}
 License: GPLv3
 Summary: Export starters and binaries from podman toolboxes
@@ -47,6 +47,10 @@ DESTDIR=%{buildroot}/%{_prefix} make install
 
 
 %changelog
+* Wed Jul 03 2024 joka63 <JoKatzer@gmx.de> 0.2.2-1
+- docs: Updated READMEs (JoKatzer@gmx.de)
+- chore: added version template for tito (JoKatzer@gmx.de)
+
 * Mon Jul 01 2024 joka63 <JoKatzer@gmx.de> 0.2.1-1
 - first package built with tito for toolbox-export version 0.2.1
 
