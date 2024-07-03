@@ -2,7 +2,7 @@
 
 Name:    toolbox-export
 Version: 0.2.2
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: GPLv3
 Summary: Export starters and binaries from podman toolboxes
 Url:     https://github.com/joka63/%{srcname}
@@ -47,6 +47,9 @@ DESTDIR=%{buildroot}/%{_prefix} make install
 
 
 %changelog
+* Wed Jul 03 2024 joka63 <JoKatzer@gmx.de> 0.2.2-2
+- test: autobuild after changing release nr (JoKatzer@gmx.de)
+
 * Wed Jul 03 2024 joka63 <JoKatzer@gmx.de> 0.2.2-1
 - docs: Updated READMEs (JoKatzer@gmx.de)
 - chore: added version template for tito (JoKatzer@gmx.de)
