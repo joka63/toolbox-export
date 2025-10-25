@@ -210,8 +210,9 @@ purge_files_in_db() {
 sep_current_toolboxes=$(joinByString "', '" $(list_toolboxes))
 sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
 .mode tabs
-DELETE from binaries WHERE container NOT IN ('$sep_current_toolboxes') ;
-DELETE from apps WHERE container NOT IN ('$sep_current_toolboxes') ;
+DELETE FROM binaries WHERE container NOT IN ('$sep_current_toolboxes') ;
+DELETE FROM apps WHERE container NOT IN ('$sep_current_toolboxes') ;
+DELETE FROM binaries WHERE path = '-exec' AND bin = 'grep' ;
 END
 echo "Cleaned up $TOOLBOX_EXPORT_DB_PATH"
 }
@@ -220,11 +221,10 @@ purge() {
 	echo "Removing starters and exported binaries not belonging to a current toolbox:"
 	update_export_db
 	Files=$(list_files_to_be_removed)
-	if [ -n "$Files" ] ; then
-		rm -i ${Files} && purge_files_in_db
-	else
-		purge_files_in_db
-	fi
+	for f in $Files ; do
+		echo rm -i "$f"
+	done
+	purge_files_in_db
 }
 
 # Parse arguments
