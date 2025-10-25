@@ -2,7 +2,7 @@
 
 Name:    toolbox-export
 Version: 0.2.2
-Release: 3%{?dist}
+Release: 4%{?dist}
 License: GPLv3
 Summary: Export starters and binaries from podman toolboxes
 Url:     https://github.com/joka63/%{srcname}
@@ -47,6 +47,11 @@ DESTDIR=%{buildroot}/%{_prefix} make install
 
 
 %changelog
+* Sat Oct 25 2025 joka63 <JoKatzer@gmx.de> 0.2.2-4
+- bump version to 0.2.3 (JoKatzer@gmx.de)
+- fix: check and refuse -a -d combo (JoKatzer@gmx.de)
+- fix: toolbox-export --purge may not clean-up db (JoKatzer@gmx.de)
+
 * Wed Jul 03 2024 joka63 <JoKatzer@gmx.de> 0.2.2-3
 - Fixed webhook's URL and Content type 
 
