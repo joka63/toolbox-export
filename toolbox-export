@@ -56,7 +56,7 @@ start_shell=""
 is_login=0
 is_sudo=0
 verbose=0
-version="0.2.1"
+version="0.2.2"
 
 CONTAINER_ID=${CONTAINER_ID-""}
 XDG_DATA_HOME=${XDG_DATA_HOME-"$HOME/.local/share"}
@@ -397,6 +397,19 @@ if [ -n "${exported_bin}" ] && [ -z "${dest_path}" ]; then
 	printf >&2 "Error: Missing argument export-path.\n"
 	exit 2
 fi
+# Ensure the argument of --app or --bin is not another option like --delete
+case "${exported_app}" in
+  -*) 
+	printf >&2 "Error: Missing or invalid application name: $exported_app\n"
+	exit 2
+	;;
+esac
+case "${exported_bin}" in
+  -*) 
+	printf >&2 "Error: Missing or invalid binary name: $exported_bin\n"
+	exit 2
+	;;
+esac
 
 declare -a ToolboxRunOptions
 if  [ -n "$CONTAINER_ID" ]; then
