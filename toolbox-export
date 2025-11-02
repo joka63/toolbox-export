@@ -48,6 +48,8 @@ exported_app_label=""
 exported_bin=""
 exported_delete=0
 extra_flags=""
+exec_opt=""
+
 # Use TOOLBOX_HOST_HOME if defined, else fallback to HOME
 #	TOOLBOX_HOST_HOME is set in case container is created
 #	with custom --home directory
@@ -85,7 +87,7 @@ toolbox-export version: ${version}
 Usage:
 	toolbox-export [-c <CONTAINER_ID>] --app mpv [--extra-flags "flags"] [--delete] [--sudo]
 	toolbox-export [-c <CONTAINER_ID>] --bin /path/to/bin --export-path ~/.local/bin [--extra-flags "flags"] [--delete] [--sudo]
-	toolbox-export [-c <CONTAINER_ID>] {--purge|--list}
+	toolbox-export [-c <CONTAINER_ID>] {--purge|--list|--update}
 
 Options:
 
@@ -99,6 +101,7 @@ Options:
 	--extra-flags/-ef:	extra flags to add to the command
 	--login/-l		run the exported item in a login shell
 	--sudo/-S:		specify if the exported item should be run as sudo inside toolbox
+	--update/-u:		update exported starters and binaries to link to current toolbox
 	--help/-h:		show this message
 	--verbose/-v:		show more verbosity
 	--version/-V:		show version
@@ -185,13 +188,19 @@ update_export_db() {
 	app_path="${host_home}/.local/share/applications"
 	find ${dest_path} -type f -exec grep -H 'exec toolbox run -c' {} \; |\
 	       	sed -e 's/:\(\s*exec\)/\1/' |\
-	       	grep -E -v '(fedora-toolbox-40|test-40)' |\
+	       	grep -E -v '(fedora-toolbox-40|test-40|grep)' |\
 	       	awk '{printf "INSERT OR IGNORE INTO binaries VALUES ('"'"'%s'"'"', '"'"'%s'"'"', '"'"'%s'"'"', %s);\n",$1,$7,$6,0;}' >> "$SQL_TMP_FILE"
 	find ${app_path} -type f -exec grep -H '^Exec=toolbox run -c' {} \; |\
 		sed -e 's/:Exec=toolbox run -c//' |\
-	       	grep -E -v '(fedora-toolbox-40|test-40)' |\
+	       	grep -E -v '(fedora-toolbox-40|test-40|grep)' |\
 		awk '{X=match($1,"^.*/applications/(.*)[.]desktop",A); P=A[1]; sub($2"-","",P); printf "INSERT OR IGNORE INTO apps VALUES ('"'"'%s'"'"', '"'"'%s'"'"', '"'"'%s'"'"', %s);\n",$1,P,$2,0;}' >> "$SQL_TMP_FILE"
-	sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE"
+	if [ -z "$exec_opt" ] ; then
+	  sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE"
+	else
+	  echo "Would update $TOOLBOX_EXPORT_DB_PATH with following commands"
+	  cat "$SQL_TMP_FILE"
+	  echo
+	fi
 }
 
 list_files_to_be_removed() {
@@ -207,14 +216,55 @@ END
 }
 
 purge_files_in_db() {
+if [ "$exec_opt" = "echo" ] ; then
+  SqlCmdA="SELECT DISTINCT container,app"
+  SqlCmdB="SELECT DISTINCT container,bin"
+else
+  SqlCmdA="DELETE"
+  SqlCmdB="DELETE"
+fi
 sep_current_toolboxes=$(joinByString "', '" $(list_toolboxes))
 sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << END
 .mode tabs
-DELETE FROM binaries WHERE container NOT IN ('$sep_current_toolboxes') ;
-DELETE FROM apps WHERE container NOT IN ('$sep_current_toolboxes') ;
-DELETE FROM binaries WHERE path = '-exec' AND bin = 'grep' ;
+$SqlCmdB FROM binaries WHERE container NOT IN ('$sep_current_toolboxes') ;
+$SqlCmdA FROM apps WHERE container NOT IN ('$sep_current_toolboxes') ;
+$SqlCmdB FROM binaries WHERE path = '-exec' AND bin = 'grep' ;
 END
 echo "Cleaned up $TOOLBOX_EXPORT_DB_PATH"
+}
+
+purge_non_existing_files_in_db() {
+  if [ "$exec_opt" = "echo" ] ; then
+    SqlCmdA="SELECT DISTINCT path"
+    SqlCmdB="SELECT DISTINCT path"
+  else
+    SqlCmdA="DELETE"
+    SqlCmdB="DELETE"
+  fi
+  mapfile -t list_bin_files < <(sqlite3  "$TOOLBOX_EXPORT_DB_PATH" <<'__END'
+  SELECT DISTINCT path from binaries ;
+__END
+  )
+  for f in "${list_bin_files[@]}" ; do
+  if [ ! -f "$f" ] ; then
+    sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << ____END
+.mode csv
+      $SqlCmdB FROM binaries WHERE path = '$f' ;
+____END
+  fi
+  done
+  mapfile -t list_app_files < <(sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << __END
+  SELECT DISTINCT path from apps ;
+__END
+  )
+  for f in "${list_app_files[@]}" ; do
+  if [ ! -f "$f" ] ; then
+    sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << ____END
+.mode csv
+      $SqlCmdA FROM apps WHERE path = '$f' ;
+____END
+  fi
+  done
 }
 
 purge() {
@@ -222,14 +272,51 @@ purge() {
 	update_export_db
 	Files=$(list_files_to_be_removed)
 	for f in $Files ; do
-		echo rm -i "$f"
+	  $exec_opt rm -i "$f"
 	done
 	purge_files_in_db
 }
 
+update() {
+  echo "Cleaning up starters and exported binaries in DB whose files don't exist anymore:"
+  purge_non_existing_files_in_db
+  echo
+  echo "Updating starters and exported binaries to ${container_name}.."
+  Containers=$(sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << __END
+  SELECT DISTINCT container FROM apps WHERE container != '${container_name}' 
+  UNION
+  SELECT DISTINCT container FROM binaries WHERE container != '${container_name}' ;
+__END
+)
+  for c in $Containers ; do
+    Apps=$(sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << ____END
+    SELECT DISTINCT app FROM apps WHERE container = '${c}' ;
+____END
+  )
+    for a in $Apps ; do
+      echo "Updating starter $a from container $c"
+      $exec_opt toolbox-export -c "$c" -a "$a" -d \
+	&& $exec_opt toolbox-export -c "${container_name}" -a "$a" \
+	|| $exec_opt toolbox-export -c "$c" -a "$a" && echo >&2 "Failed updating '$a'" 
+    done
+
+    Bins=$(sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << ____END
+    SELECT DISTINCT bin FROM binaries WHERE container = '${c}' ;
+____END
+  )
+    for b in $Bins ; do
+      echo "Updating binary $b from container $c"
+      $exec_opt toolbox-export -c "$c" -b "$b" -d \
+	&& $exec_opt toolbox-export -c "${container_name}" -b "$b" \
+	|| $exec_opt toolbox-export -c "$c" -b "$b" && echo >&2 "Failed updating '$b'" 
+    done
+  done
+  exit 0
+}
+
 # Parse arguments
-TEMP=$(getopt -o hvVc:a:b:lSd \
-	--long help,verbose,version,container:,app:,bin:,login,sudo,delete,export-label:,export-path:,extra-flags:,list,purge,setup,cleanup \
+TEMP=$(getopt -o hvnVc:a:b:lSdu \
+	--long help,verbose,dry-run,version,container:,app:,bin:,login,sudo,delete,update,export-label:,export-path:,extra-flags:,list,purge,setup,cleanup \
         -n 'toolbox-export' -- "$@")
 if [ $? != 0 ] ; then exit 1 ; fi
 eval set -- "$TEMP"
@@ -244,6 +331,11 @@ while :; do
 		-v | --verbose)
 			shift
 			verbose=1
+			;;
+		-n | --dry-run)
+			# Currently undocumented. Applicable only to --update option
+			shift
+			exec_opt="echo"
 			;;
 		-V | --version)
 			printf "toolbox: %s\n" "${version}"
@@ -310,6 +402,10 @@ while :; do
 			action="purge"
 			shift
 			;;
+		-u | --update)
+			action="update"
+			shift
+			;;
 		--setup)
 			action="setup"
 			shift
@@ -351,6 +447,24 @@ if [ "$(id -u)" -eq 0 ]; then
 	exit 1
 fi
 
+# Determine used toolbox
+declare -a ToolboxRunOptions
+if  [ -n "$CONTAINER_ID" ]; then
+	container_name="${CONTAINER_ID}"
+	ToolboxRunOptions+=("-c" "${CONTAINER_ID}")
+else
+	# Use the default toolbox and retrieve its container name
+	container_name=$(
+	${TOOLBOX_PATH:-"toolbox"} run bash << ________END
+	grep "name=" /run/.containerenv | cut -d'=' -f2- | tr -d '"'
+________END
+	)
+	if [ $? -ne 0 ] ; then
+		printf >&2 "Error: Default toolbox not running.\n"
+		exit 2
+	fi
+fi
+
 # Handle special actions here
 case "${action}" in
 	setup)
@@ -363,6 +477,10 @@ case "${action}" in
 		;;
 	purge)
 		purge
+		exit 0
+		;;
+	update)
+		update
 		exit 0
 		;;
 	cleanup)
@@ -410,23 +528,6 @@ case "${exported_bin}" in
 	exit 2
 	;;
 esac
-
-declare -a ToolboxRunOptions
-if  [ -n "$CONTAINER_ID" ]; then
-	container_name="${CONTAINER_ID}"
-	ToolboxRunOptions+=("-c" "${CONTAINER_ID}")
-else
-	# Use the default toolbox and retrieve its container name
-	container_name=$(
-	${TOOLBOX_PATH:-"toolbox"} run bash << ________END
-	grep "name=" /run/.containerenv | cut -d'=' -f2- | tr -d '"'
-________END
-	)
-	if [ $? -ne 0 ] ; then
-		printf >&2 "Error: Default toolbox not running.\n"
-		exit 2
-	fi
-fi
 
 #
 if [ "${is_login}" -ne 0 ] && [ "${is_sudo}" -ne 0 ]; then
