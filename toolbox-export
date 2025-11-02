@@ -183,6 +183,12 @@ joinByString() {
   printf "%s" "$first" "${@/#/$separator}"
 }
 
+sql_escape() {
+  # ' -> '' (SQL-Escape)
+  local s="$1"
+  printf "%s" "${s//\'/\'\'}"
+}
+
 update_export_db() {
 	rm -f "$SQL_TMP_FILE"
 	app_path="${host_home}/.local/share/applications"
@@ -283,32 +289,32 @@ update() {
   echo
   echo "Updating starters and exported binaries to ${container_name}.."
   Containers=$(sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << __END
-  SELECT DISTINCT container FROM apps WHERE container != '${container_name}' 
+  SELECT DISTINCT container FROM apps WHERE container != '$(sql_escape "${container_name}")' 
   UNION
-  SELECT DISTINCT container FROM binaries WHERE container != '${container_name}' ;
+  SELECT DISTINCT container FROM binaries WHERE container != '$(sql_escape "${container_name}")' ;
 __END
 )
   for c in $Containers ; do
     Apps=$(sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << ____END
-    SELECT DISTINCT app FROM apps WHERE container = '${c}' ;
+    SELECT DISTINCT app FROM apps WHERE container = '$(sql_escape "${c}")' ;
 ____END
   )
     for a in $Apps ; do
       echo "Updating starter $a from container $c"
       $exec_opt toolbox-export -c "$c" -a "$a" -d \
 	&& $exec_opt toolbox-export -c "${container_name}" -a "$a" \
-	|| $exec_opt toolbox-export -c "$c" -a "$a" && echo >&2 "Failed updating '$a'" 
+	|| { echo >&2 "Failed updating '$a'" && $exec_opt toolbox-export -c "$c" -a "$a" && echo >&2 "Restored starter from '$c'" ; }
     done
 
     Bins=$(sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << ____END
-    SELECT DISTINCT bin FROM binaries WHERE container = '${c}' ;
+    SELECT DISTINCT bin FROM binaries WHERE container = '$(sql_escape ${c})' ;
 ____END
   )
     for b in $Bins ; do
       echo "Updating binary $b from container $c"
       $exec_opt toolbox-export -c "$c" -b "$b" -d \
 	&& $exec_opt toolbox-export -c "${container_name}" -b "$b" \
-	|| $exec_opt toolbox-export -c "$c" -b "$b" && echo >&2 "Failed updating '$b'" 
+	|| { echo >&2 "Failed updating '$b'" && $exec_opt toolbox-export -c "$c" -b "$b" && echo >&2 "Restored starter from '$c'" ; }
     done
   done
   exit 0
@@ -609,7 +615,7 @@ ________________________EOF
 if [ ! -f /run/.containerenv ] ; then
 	if [ "\\\$(id -u)" -eq 0 ]; then
 		printf >&2 "You must not run %s as root in a toolbox container!\n" " \$(basename "${exported_bin}")"
-		exit 127
+		exit 17
 	fi
 	exec ${TOOLBOX_PATH:-"toolbox"} run -c ${container_name} \
 		${start_shell} ${exported_bin} ${extra_flags} "\\\$@"
@@ -628,7 +634,7 @@ EOF
 	# Ensure the binary we're exporting is installed
 	if [ ! -f "${exported_bin}" ]; then
 		printf >&2 "Error: cannot find %s.\n" "${exported_bin}"
-		exit 127
+		exit 11
 	fi
 	# generate dest_file path
 	dest_file="${dest_path}/\$(basename "${exported_bin}")"
@@ -739,7 +745,7 @@ ________________________EOF
 	if [ -z "\${desktop_files}" ]; then
 		printf >&2 "Error: cannot find any desktop files.\n"
 		printf >&2 "Error: trying to export a non-installed application.\n"
-		exit 127
+		exit 11
 	fi
 
 	# Find icons by usinc the Icon= specification. If it's only a name, we'll
