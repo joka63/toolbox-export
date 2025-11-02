@@ -194,11 +194,11 @@ update_export_db() {
 	app_path="${host_home}/.local/share/applications"
 	find ${dest_path} -type f -exec grep -H 'exec toolbox run -c' {} \; |\
 	       	sed -e 's/:\(\s*exec\)/\1/' |\
-	       	grep -E -v '(fedora-toolbox-40|test-40|grep)' |\
+	       	grep -E -v '(grep)' |\
 	       	awk '{printf "INSERT OR IGNORE INTO binaries VALUES ('"'"'%s'"'"', '"'"'%s'"'"', '"'"'%s'"'"', %s);\n",$1,$7,$6,0;}' >> "$SQL_TMP_FILE"
 	find ${app_path} -type f -exec grep -H '^Exec=toolbox run -c' {} \; |\
 		sed -e 's/:Exec=toolbox run -c//' |\
-	       	grep -E -v '(fedora-toolbox-40|test-40|grep)' |\
+		grep -E -v '(grep)' |\
 		awk '{X=match($1,"^.*/applications/(.*)[.]desktop",A); P=A[1]; sub($2"-","",P); printf "INSERT OR IGNORE INTO apps VALUES ('"'"'%s'"'"', '"'"'%s'"'"', '"'"'%s'"'"', %s);\n",$1,P,$2,0;}' >> "$SQL_TMP_FILE"
 	if [ -z "$exec_opt" ] ; then
 	  sqlite3 "$TOOLBOX_EXPORT_DB_PATH" < "$SQL_TMP_FILE"
