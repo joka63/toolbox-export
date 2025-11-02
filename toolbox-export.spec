@@ -1,7 +1,7 @@
 %global srcname toolbox-export
 
 Name:    toolbox-export
-Version: 0.2.3
+Version: 0.3.0
 Release: 1%{?dist}
 License: GPLv3
 Summary: Export starters and binaries from podman toolboxes
@@ -47,6 +47,13 @@ DESTDIR=%{buildroot}/%{_prefix} make install
 
 
 %changelog
+* Sun Nov 02 2025 joka63 <JoKatzer@gmx.de> 0.3.0-1
+- feat: new option -u/--update (JoKatzer@gmx.de)
+- fix: unnecessary local filter in update function (JoKatzer@gmx.de)
+- fix: potential SQL injection in update function (JoKatzer@gmx.de)
+- fix: wrong failure message when updating (JoKatzer@gmx.de)
+- Bump version to 0.3.0 and updated man pages (JoKatzer@gmx.de)
+
 * Sat Oct 25 2025 joka63 <JoKatzer@gmx.de> 0.2.3-1
 - Update version to 0.2.3 
 
