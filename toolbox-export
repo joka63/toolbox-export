@@ -255,7 +255,7 @@ __END
   if [ ! -f "$f" ] ; then
     sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << ____END
 .mode csv
-      $SqlCmdB FROM binaries WHERE path = '$f' ;
+      $SqlCmdB FROM binaries WHERE path = '$(sql_escape "$f")' ;
 ____END
   fi
   done
@@ -267,7 +267,7 @@ __END
   if [ ! -f "$f" ] ; then
     sqlite3  "$TOOLBOX_EXPORT_DB_PATH" << ____END
 .mode csv
-      $SqlCmdA FROM apps WHERE path = '$f' ;
+      $SqlCmdA FROM apps WHERE path = '$(sql_escape "$f")' ;
 ____END
   fi
   done
