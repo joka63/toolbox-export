@@ -1,7 +1,7 @@
 toolbox-export(1)
 =================
-:date: 2025-10-25
-:release-version: 0.2.3
+:date: 2025-11-02
+:release-version: 0.3.0
 :man manual: Toolbox-Export Manual
 :man source: toolbox-export {release-version}
 
@@ -17,7 +17,7 @@ SYNOPSIS
 [verse]
 toolbox-export [-c _Toolbox_Name_] --app _Package_Name_ [--delete] [_Option_]..
 toolbox-export [-c _Toolbox_Name_] --bin _/path/to/bin_ [--delete] [_Option_]..
-toolbox-export {--list|--purge}
+toolbox-export {--list|--purge|--update}
 toolbox-export [-h|--help|-V|--version]
 
 
@@ -59,6 +59,9 @@ OPTIONS
 
 --purge::		
     remove all exported app starters and icons not belonging to a toolbox
+
+--update/-u::		
+    updates exported app starters and binaries to use the current toolbox
 
 --export-label::	
     label to add to exported application name.
@@ -146,6 +149,19 @@ binaries added by toolbox-export before without sqlite3 support.
 
 toolbox-export asks for confirmation for each starter or binary it would
 remove on purge.
+
+**Update**
+
+With the option `--update` or `-u` it is possible to move all starters and exported binaries
+from old toolboxes to the latest one with one command. 
+This is especially useful after a distro upgrade
+when the standard container like `fedora-toolbox-42` is rebuilt (e.g. to `fedora-toolbox-43`).
+The update options supports also a dry-run option "-n". 
+
+	toolbox enter 
+  	sudo dnf install toolbox-export
+	toolbox-export -n --update # dry-run
+	toolbox-export --update
 
 **Run as root in the container**
 

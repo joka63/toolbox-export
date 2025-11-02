@@ -58,7 +58,7 @@ start_shell=""
 is_login=0
 is_sudo=0
 verbose=0
-version="0.2.3"
+version="0.3.0"
 
 CONTAINER_ID=${CONTAINER_ID-""}
 XDG_DATA_HOME=${XDG_DATA_HOME-"$HOME/.local/share"}
@@ -338,7 +338,7 @@ while :; do
 			exec_opt="echo"
 			;;
 		-V | --version)
-			printf "toolbox: %s\n" "${version}"
+			printf "toolbox-export: %s\n" "${version}"
 			exit 0
 			;;
 		-c | --container)
