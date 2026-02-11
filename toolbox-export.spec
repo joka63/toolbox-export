@@ -25,7 +25,7 @@ Toolbox-export is basically an adaptation of the distrobox shell script distrobo
 
 %prep
 %autosetup
-sed 's/^version=.*$/'$(cat VERSION.txt)'/' toolbox-export
+sed -i 's/^version=.*$/'$(cat VERSION.txt)'/' toolbox-export
 
 
 %build

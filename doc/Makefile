@@ -1,3 +1,4 @@
+VERSION    := $(shell grep '^version\s*=\s*' ../VERSION.txt | sed -e 's/version\s*=\s*"\(.*\)"/\1/')
 DOCS       = FAQ.md
 MAN_MAN1   = toolbox-export.1
 
@@ -12,8 +13,8 @@ ifeq ($(COMPRESS), yes)
 endif
 
 # convert using "asciidoctor": <https://asciidoctor.org>
-ASCIIDOCTOR_MANPAGE = asciidoctor -d manpage -b manpage
-ASCIIDOCTOR_HTML    = asciidoctor -b html5 -d article
+ASCIIDOCTOR_MANPAGE = asciidoctor -d manpage -b manpage -a release-version=$(VERSION)
+ASCIIDOCTOR_HTML    = asciidoctor -b html5 -d article -a release-version=$(VERSION)
 
 # reproducible builds: reference date is ":date:" attribute from asciidoc source
 date_attr = $(shell sed -rn 's/:date:\s*//p' $(1))
@@ -36,11 +37,8 @@ clean:
 %.gz : %
 	gzip -9 -n -c $< > $@
 
-%.1 : %.1.asciidoc
+%.1 : %.1.asciidoc ../VERSION.txt
 	SOURCE_DATE_EPOCH=$(call source_date_epoch,$<) $(ASCIIDOCTOR_MANPAGE) -o $@ $<
 
-%.5 : %.5.asciidoc
-	SOURCE_DATE_EPOCH=$(call source_date_epoch,$<) $(ASCIIDOCTOR_MANPAGE) -o $@ $<
-
-%.html : %.asciidoc
+%.html : %.asciidoc ../VERSION.txt
 	SOURCE_DATE_EPOCH=$(call source_date_epoch,$<) $(ASCIIDOCTOR_HTML) -o $@ $<
