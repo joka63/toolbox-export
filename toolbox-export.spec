@@ -2,7 +2,7 @@
 
 Name:    toolbox-export
 Version: 0.3.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: GPLv3
 Summary: Export starters and binaries from podman toolboxes
 Url:     https://github.com/joka63/%{srcname}
@@ -47,6 +47,9 @@ DESTDIR=%{buildroot}/%{_prefix} make install
 
 
 %changelog
+* Wed Feb 11 2026 Joachim Katzer <joka63@gmx.de> 0.3.0-2
+- Test
+
 * Sun Nov 02 2025 joka63 <JoKatzer@gmx.de> 0.3.0-1
 - feat: new option -u/--update (JoKatzer@gmx.de)
 - fix: unnecessary local filter in update function (JoKatzer@gmx.de)
