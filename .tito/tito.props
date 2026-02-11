@@ -7,5 +7,5 @@ changelog_format = %s (%ae)
 
 [version_template]
 destination_file = VERSION.txt
-template_file = .tito/templates/VERSION.txt.teplate
+template_file = .tito/templates/VERSION.txt.template
 
