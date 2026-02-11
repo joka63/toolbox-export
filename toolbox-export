@@ -458,6 +458,10 @@ declare -a ToolboxRunOptions
 if  [ -n "$CONTAINER_ID" ]; then
 	container_name="${CONTAINER_ID}"
 	ToolboxRunOptions+=("-c" "${CONTAINER_ID}")
+elif [ -f /run/.containerenv ] ; then
+	# Inside a toolbox: use its container name
+	container_name=$(grep "name=" /run/.containerenv | cut -d'=' -f2- | tr -d '"')
+	ToolboxRunOptions+=("-c" "${container_name}")
 else
 	# Use the default toolbox and retrieve its container name
 	container_name=$(
