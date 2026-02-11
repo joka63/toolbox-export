@@ -51,13 +51,6 @@ DESTDIR=%{buildroot}/%{_prefix} make install
 - chore: automated version update on tito tag (joka63@gmx.de)
 - fix: not working inside toolbox without option -c (joka63@gmx.de)
 
-* Wed Feb 11 2026 Joachim Katzer <joka63@gmx.de>
-- chore: automated version update on tito tag (joka63@gmx.de)
-- fix: not working inside toolbox without option -c (joka63@gmx.de)
-
-* Wed Feb 11 2026 Joachim Katzer <joka63@gmx.de> 0.3.0-2
-- Test
-
 * Sun Nov 02 2025 joka63 <JoKatzer@gmx.de> 0.3.0-1
 - feat: new option -u/--update (JoKatzer@gmx.de)
 - fix: unnecessary local filter in update function (JoKatzer@gmx.de)
